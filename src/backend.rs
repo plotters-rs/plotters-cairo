@@ -1,10 +1,8 @@
 use cairo::{Context as CairoContext, FontSlant, FontWeight, Status as CairoStatus};
 
 #[allow(unused_imports)]
-use crate::drawing::backend::{BackendCoord, BackendStyle, DrawingBackend, DrawingErrorKind};
-use crate::style::text_anchor::{HPos, VPos};
-#[allow(unused_imports)]
-use crate::style::{Color, FontDesc, FontStyle, FontTransform, RGBAColor, TextStyle};
+use plotters_backend::{BackendCoord, BackendStyle, DrawingBackend, DrawingErrorKind, FontStyle, FontTransform, BackendColor, BackendTextStyle};
+use plotters_backend::text_anchor::{HPos, VPos};
 
 /// The drawing backend that is backed with a Cairo context
 pub struct CairoBackend<'a> {
@@ -50,13 +48,13 @@ impl<'a> CairoBackend<'a> {
         }
     }
 
-    fn set_color(&self, color: &RGBAColor) -> Result<(), DrawingErrorKind<CairoError>> {
+    fn set_color(&self, color: &BackendColor) -> Result<(), DrawingErrorKind<CairoError>> {
         self.call_cairo(|c| {
             c.set_source_rgba(
-                f64::from(color.rgb().0) / 255.0,
-                f64::from(color.rgb().1) / 255.0,
-                f64::from(color.rgb().2) / 255.0,
-                color.alpha(),
+                f64::from(color.rgb.0) / 255.0,
+                f64::from(color.rgb.1) / 255.0,
+                f64::from(color.rgb.2) / 255.0,
+                color.alpha,
             )
         })
     }
@@ -65,21 +63,21 @@ impl<'a> CairoBackend<'a> {
         self.call_cairo(|c| c.set_line_width(f64::from(width)))
     }
 
-    fn set_font<'b>(&self, font: &FontDesc<'b>) -> Result<(), DrawingErrorKind<CairoError>> {
-        let actual_size = font.get_size();
+    fn set_font<S: BackendTextStyle>(&self, font: &S) -> Result<(), DrawingErrorKind<CairoError>> {
+        let actual_size = font.size();
         self.call_cairo(|c| {
-            match font.get_style() {
+            match font.style() {
                 FontStyle::Normal => {
-                    c.select_font_face(font.get_name(), FontSlant::Normal, FontWeight::Normal)
+                    c.select_font_face(font.family().as_str(), FontSlant::Normal, FontWeight::Normal)
                 }
                 FontStyle::Bold => {
-                    c.select_font_face(font.get_name(), FontSlant::Normal, FontWeight::Bold)
+                    c.select_font_face(font.family().as_str(), FontSlant::Normal, FontWeight::Bold)
                 }
                 FontStyle::Oblique => {
-                    c.select_font_face(font.get_name(), FontSlant::Oblique, FontWeight::Normal)
+                    c.select_font_face(font.family().as_str(), FontSlant::Oblique, FontWeight::Normal)
                 }
                 FontStyle::Italic => {
-                    c.select_font_face(font.get_name(), FontSlant::Italic, FontWeight::Normal)
+                    c.select_font_face(font.family().as_str(), FontSlant::Italic, FontWeight::Normal)
                 }
             };
             c.set_font_size(actual_size);
@@ -125,15 +123,15 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
     fn draw_pixel(
         &mut self,
         point: BackendCoord,
-        color: &RGBAColor,
+        color: BackendColor,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
         self.call_cairo(|c| {
             c.rectangle(f64::from(point.0), f64::from(point.1), 1.0, 1.0);
             c.set_source_rgba(
-                f64::from(color.rgb().0) / 255.0,
-                f64::from(color.rgb().1) / 255.0,
-                f64::from(color.rgb().2) / 255.0,
-                color.alpha(),
+                f64::from(color.rgb.0) / 255.0,
+                f64::from(color.rgb.1) / 255.0,
+                f64::from(color.rgb.2) / 255.0,
+                color.alpha,
             );
             c.fill();
         })
@@ -145,7 +143,7 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         to: BackendCoord,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.as_color())?;
+        self.set_color(&style.color())?;
         self.set_stroke_width(style.stroke_width())?;
 
         self.call_cairo(|c| {
@@ -162,7 +160,7 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         style: &S,
         fill: bool,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.as_color())?;
+        self.set_color(&style.color())?;
         self.set_stroke_width(style.stroke_width())?;
 
         self.call_cairo(|c| {
@@ -185,7 +183,7 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         path: I,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.as_color())?;
+        self.set_color(&style.color())?;
         self.set_stroke_width(style.stroke_width())?;
 
         let mut path = path.into_iter();
@@ -205,7 +203,7 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         path: I,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.as_color())?;
+        self.set_color(&style.color())?;
         self.set_stroke_width(style.stroke_width())?;
 
         let mut path = path.into_iter();
@@ -233,7 +231,7 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         style: &S,
         fill: bool,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.as_color())?;
+        self.set_color(&style.color())?;
         self.set_stroke_width(style.stroke_width())?;
 
         self.call_cairo(|c| {
@@ -254,29 +252,28 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         })
     }
 
-    fn estimate_text_size<'b>(
+    fn estimate_text_size<S: BackendTextStyle>(
         &self,
         text: &str,
-        font: &FontDesc<'b>,
+        font: &S,
     ) -> Result<(u32, u32), DrawingErrorKind<Self::ErrorType>> {
-        self.set_font(&font)?;
+        self.set_font(font)?;
         self.call_cairo(|c| {
             let extents = c.text_extents(text);
             (extents.width as u32, extents.height as u32)
         })
     }
 
-    fn draw_text(
+    fn draw_text<S: BackendTextStyle>(
         &mut self,
         text: &str,
-        style: &TextStyle,
+        style: &S,
         pos: BackendCoord,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        let font = &style.font;
-        let color = &style.color;
+        let color = style.color();
         let (mut x, mut y) = (pos.0, pos.1);
 
-        let degree = match font.get_transform() {
+        let degree = match style.transform() {
             FontTransform::None => 0.0,
             FontTransform::Rotate90 => 90.0,
             FontTransform::Rotate180 => 180.0,
@@ -294,17 +291,17 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
             y = 0;
         }
 
-        self.set_font(&font)?;
+        self.set_font(style)?;
         self.set_color(&color)?;
 
         self.call_cairo(|c| {
             let extents = c.text_extents(text);
-            let dx = match style.pos.h_pos {
+            let dx = match style.anchor().h_pos {
                 HPos::Left => 0.0,
                 HPos::Right => -extents.width,
                 HPos::Center => -extents.width / 2.0,
             };
-            let dy = match style.pos.v_pos {
+            let dy = match style.anchor().v_pos {
                 VPos::Top => extents.height,
                 VPos::Center => extents.height / 2.0,
                 VPos::Bottom => 0.0,
@@ -324,8 +321,8 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::prelude::*;
-    use crate::style::text_anchor::{HPos, Pos, VPos};
+    use plotters::prelude::*;
+    use plotters_backend::text_anchor::{HPos, Pos, VPos};
     use std::fs;
     use std::path::Path;
 
