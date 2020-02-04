@@ -1,8 +1,11 @@
 use cairo::{Context as CairoContext, FontSlant, FontWeight, Status as CairoStatus};
 
-#[allow(unused_imports)]
-use plotters_backend::{BackendCoord, BackendStyle, DrawingBackend, DrawingErrorKind, FontStyle, FontTransform, BackendColor, BackendTextStyle};
 use plotters_backend::text_anchor::{HPos, VPos};
+#[allow(unused_imports)]
+use plotters_backend::{
+    BackendColor, BackendCoord, BackendStyle, BackendTextStyle, DrawingBackend, DrawingErrorKind,
+    FontStyle, FontTransform,
+};
 
 /// The drawing backend that is backed with a Cairo context
 pub struct CairoBackend<'a> {
@@ -67,18 +70,24 @@ impl<'a> CairoBackend<'a> {
         let actual_size = font.size();
         self.call_cairo(|c| {
             match font.style() {
-                FontStyle::Normal => {
-                    c.select_font_face(font.family().as_str(), FontSlant::Normal, FontWeight::Normal)
-                }
+                FontStyle::Normal => c.select_font_face(
+                    font.family().as_str(),
+                    FontSlant::Normal,
+                    FontWeight::Normal,
+                ),
                 FontStyle::Bold => {
                     c.select_font_face(font.family().as_str(), FontSlant::Normal, FontWeight::Bold)
                 }
-                FontStyle::Oblique => {
-                    c.select_font_face(font.family().as_str(), FontSlant::Oblique, FontWeight::Normal)
-                }
-                FontStyle::Italic => {
-                    c.select_font_face(font.family().as_str(), FontSlant::Italic, FontWeight::Normal)
-                }
+                FontStyle::Oblique => c.select_font_face(
+                    font.family().as_str(),
+                    FontSlant::Oblique,
+                    FontWeight::Normal,
+                ),
+                FontStyle::Italic => c.select_font_face(
+                    font.family().as_str(),
+                    FontSlant::Italic,
+                    FontWeight::Normal,
+                ),
             };
             c.set_font_size(actual_size);
         })
