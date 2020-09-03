@@ -1,6 +1,6 @@
 [package]
 name = "plotters-cairo"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Hao Hou <haohou302@gmail.com>"]
 edition = "2018"
 description = "Plotters Cairo backend"
@@ -9,7 +9,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-plotters-backend = "0.0.*"
+plotters-backend = "^0.3.*"
 
 [dependencies.cairo-rs]
 version = "0.8.0"
