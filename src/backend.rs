@@ -1,4 +1,4 @@
-use cairo::{Context as CairoContext, FontSlant, FontWeight, Status as CairoStatus};
+use cairo::{Context as CairoContext, FontSlant, FontWeight};
 
 use plotters_backend::text_anchor::{HPos, VPos};
 #[allow(unused_imports)]
@@ -16,7 +16,7 @@ pub struct CairoBackend<'a> {
 }
 
 #[derive(Debug)]
-pub struct CairoError(CairoStatus);
+pub struct CairoError;
 
 impl std::fmt::Display for CairoError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -43,12 +43,14 @@ impl<'a> CairoBackend<'a> {
         f: F,
     ) -> Result<T, DrawingErrorKind<CairoError>> {
         let result = f(self.context);
-        let status = self.context.status();
-        if status == CairoStatus::Success {
-            Ok(result)
-        } else {
+        //let status = self.context.status();
+        //if status == CairoStatus::Success {
+        //TODO: See isues https://github.com/gtk-rs/cairo/issues/338 when Cairo-rs fix this issue,
+        //we will be ready to handle errors
+        Ok(result)
+        /*} else {
             Err(DrawingErrorKind::DrawingError(CairoError(status)))
-        }
+        }*/
     }
 
     fn set_color(&self, color: &BackendColor) -> Result<(), DrawingErrorKind<CairoError>> {
