@@ -16,6 +16,7 @@ plotters-backend = "^0.3.0"
 
 [dependencies.cairo-rs]
 version = "0.9.1"
+default_features = false
 features = ["ps"]
 
 [dev-dependencies]
