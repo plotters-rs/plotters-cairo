@@ -1,3 +1,3 @@
 mod backend;
 
-pub use backend::CairoBackend;
+pub use backend::{CairoBackend, CairoError};
