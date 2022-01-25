@@ -15,99 +15,58 @@ pub struct CairoBackend<'a> {
     init_flag: bool,
 }
 
-#[derive(Debug)]
-pub struct CairoError;
-
-impl std::fmt::Display for CairoError {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(fmt, "{:?}", self)
-    }
-}
-
-impl std::error::Error for CairoError {}
-
 impl<'a> CairoBackend<'a> {
-    /// Call cairo functions and verify the cairo status afterward.
-    ///
-    /// All major cairo objects retain an error status internally
-    /// which can be queried anytime by the users using status() method.
-    /// In the mean time, it is safe to call all cairo functions normally even
-    /// if the underlying object is in an error status.
-    /// This means that no error handling code is required before or after
-    /// each individual cairo function call.
-    ///
-    /// - `f`: The function to call
-    /// - *Returns* The wrapped result of the function
-    fn call_cairo<T, F: Fn(&CairoContext) -> T>(
-        &self,
-        f: F,
-    ) -> Result<T, DrawingErrorKind<CairoError>> {
-        let result = f(self.context);
-        //let status = self.context.status();
-        //if status == CairoStatus::Success {
-        //TODO: See isues https://github.com/gtk-rs/cairo/issues/338 when Cairo-rs fix this issue,
-        //we will be ready to handle errors
-        Ok(result)
-        /*} else {
-            Err(DrawingErrorKind::DrawingError(CairoError(status)))
-        }*/
+    fn set_color(&self, color: &BackendColor) {
+        self.context.set_source_rgba(
+            f64::from(color.rgb.0) / 255.0,
+            f64::from(color.rgb.1) / 255.0,
+            f64::from(color.rgb.2) / 255.0,
+            color.alpha,
+        );
     }
 
-    fn set_color(&self, color: &BackendColor) -> Result<(), DrawingErrorKind<CairoError>> {
-        self.call_cairo(|c| {
-            c.set_source_rgba(
-                f64::from(color.rgb.0) / 255.0,
-                f64::from(color.rgb.1) / 255.0,
-                f64::from(color.rgb.2) / 255.0,
-                color.alpha,
-            )
-        })
+    fn set_stroke_width(&self, width: u32) {
+        self.context.set_line_width(f64::from(width));
     }
 
-    fn set_stroke_width(&self, width: u32) -> Result<(), DrawingErrorKind<CairoError>> {
-        self.call_cairo(|c| c.set_line_width(f64::from(width)))
+    fn set_font<S: BackendTextStyle>(&self, font: &S) {
+        match font.style() {
+            FontStyle::Normal => self.context.select_font_face(
+                font.family().as_str(),
+                FontSlant::Normal,
+                FontWeight::Normal,
+            ),
+            FontStyle::Bold => self.context.select_font_face(
+                font.family().as_str(),
+                FontSlant::Normal,
+                FontWeight::Bold,
+            ),
+            FontStyle::Oblique => self.context.select_font_face(
+                font.family().as_str(),
+                FontSlant::Oblique,
+                FontWeight::Normal,
+            ),
+            FontStyle::Italic => self.context.select_font_face(
+                font.family().as_str(),
+                FontSlant::Italic,
+                FontWeight::Normal,
+            ),
+        };
+        self.context.set_font_size(font.size());
     }
 
-    fn set_font<S: BackendTextStyle>(&self, font: &S) -> Result<(), DrawingErrorKind<CairoError>> {
-        let actual_size = font.size();
-        self.call_cairo(|c| {
-            match font.style() {
-                FontStyle::Normal => c.select_font_face(
-                    font.family().as_str(),
-                    FontSlant::Normal,
-                    FontWeight::Normal,
-                ),
-                FontStyle::Bold => {
-                    c.select_font_face(font.family().as_str(), FontSlant::Normal, FontWeight::Bold)
-                }
-                FontStyle::Oblique => c.select_font_face(
-                    font.family().as_str(),
-                    FontSlant::Oblique,
-                    FontWeight::Normal,
-                ),
-                FontStyle::Italic => c.select_font_face(
-                    font.family().as_str(),
-                    FontSlant::Italic,
-                    FontWeight::Normal,
-                ),
-            };
-            c.set_font_size(actual_size);
-        })
-    }
-
-    pub fn new(context: &'a CairoContext, (w, h): (u32, u32)) -> Result<Self, CairoError> {
-        let ret = Self {
+    pub fn new(context: &'a CairoContext, (w, h): (u32, u32)) -> Self {
+        Self {
             context,
             width: w,
             height: h,
             init_flag: false,
-        };
-        Ok(ret)
+        }
     }
 }
 
 impl<'a> DrawingBackend for CairoBackend<'a> {
-    type ErrorType = CairoError;
+    type ErrorType = cairo::Error;
 
     fn get_size(&self) -> (u32, u32) {
         (self.width, self.height)
@@ -115,15 +74,19 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
 
     fn ensure_prepared(&mut self) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
         if !self.init_flag {
-            self.call_cairo(|c| {
-                let (x0, y0, x1, y1) = c.clip_extents();
-                c.scale(
-                    (x1 - x0) / f64::from(self.width),
-                    (y1 - y0) / f64::from(self.height),
-                )
-            })?;
+            let (x0, y0, x1, y1) = self
+                .context
+                .clip_extents()
+                .map_err(DrawingErrorKind::DrawingError)?;
+
+            self.context.scale(
+                (x1 - x0) / f64::from(self.width),
+                (y1 - y0) / f64::from(self.height),
+            );
+
             self.init_flag = true;
         }
+
         Ok(())
     }
 
@@ -136,16 +99,20 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         point: BackendCoord,
         color: BackendColor,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.call_cairo(|c| {
-            c.rectangle(f64::from(point.0), f64::from(point.1), 1.0, 1.0);
-            c.set_source_rgba(
-                f64::from(color.rgb.0) / 255.0,
-                f64::from(color.rgb.1) / 255.0,
-                f64::from(color.rgb.2) / 255.0,
-                color.alpha,
-            );
-            c.fill();
-        })
+        self.context
+            .rectangle(f64::from(point.0), f64::from(point.1), 1.0, 1.0);
+        self.context.set_source_rgba(
+            f64::from(color.rgb.0) / 255.0,
+            f64::from(color.rgb.1) / 255.0,
+            f64::from(color.rgb.2) / 255.0,
+            color.alpha,
+        );
+
+        self.context
+            .fill()
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        Ok(())
     }
 
     fn draw_line<S: BackendStyle>(
@@ -154,14 +121,17 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         to: BackendCoord,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.color())?;
-        self.set_stroke_width(style.stroke_width())?;
+        self.set_color(&style.color());
+        self.set_stroke_width(style.stroke_width());
 
-        self.call_cairo(|c| {
-            c.move_to(f64::from(from.0), f64::from(from.1));
-            c.line_to(f64::from(to.0), f64::from(to.1));
-            c.stroke();
-        })
+        self.context.move_to(f64::from(from.0), f64::from(from.1));
+        self.context.line_to(f64::from(to.0), f64::from(to.1));
+
+        self.context
+            .stroke()
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        Ok(())
     }
 
     fn draw_rect<S: BackendStyle>(
@@ -171,22 +141,27 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         style: &S,
         fill: bool,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.color())?;
-        self.set_stroke_width(style.stroke_width())?;
+        self.set_color(&style.color());
+        self.set_stroke_width(style.stroke_width());
 
-        self.call_cairo(|c| {
-            c.rectangle(
-                f64::from(upper_left.0),
-                f64::from(upper_left.1),
-                f64::from(bottom_right.0 - upper_left.0),
-                f64::from(bottom_right.1 - upper_left.1),
-            );
-            if fill {
-                c.fill();
-            } else {
-                c.stroke();
-            }
-        })
+        self.context.rectangle(
+            f64::from(upper_left.0),
+            f64::from(upper_left.1),
+            f64::from(bottom_right.0 - upper_left.0),
+            f64::from(bottom_right.1 - upper_left.1),
+        );
+
+        if fill {
+            self.context
+                .fill()
+                .map_err(DrawingErrorKind::DrawingError)?;
+        } else {
+            self.context
+                .stroke()
+                .map_err(DrawingErrorKind::DrawingError)?;
+        }
+
+        Ok(())
     }
 
     fn draw_path<S: BackendStyle, I: IntoIterator<Item = BackendCoord>>(
@@ -194,19 +169,23 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         path: I,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.color())?;
-        self.set_stroke_width(style.stroke_width())?;
+        self.set_color(&style.color());
+        self.set_stroke_width(style.stroke_width());
 
         let mut path = path.into_iter();
         if let Some((x, y)) = path.next() {
-            self.call_cairo(|c| c.move_to(f64::from(x), f64::from(y)))?;
+            self.context.move_to(f64::from(x), f64::from(y));
         }
 
         for (x, y) in path {
-            self.call_cairo(|c| c.line_to(f64::from(x), f64::from(y)))?;
+            self.context.line_to(f64::from(x), f64::from(y));
         }
 
-        self.call_cairo(|c| c.stroke())
+        self.context
+            .stroke()
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        Ok(())
     }
 
     fn fill_polygon<S: BackendStyle, I: IntoIterator<Item = BackendCoord>>(
@@ -214,25 +193,25 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         path: I,
         style: &S,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.color())?;
-        self.set_stroke_width(style.stroke_width())?;
+        self.set_color(&style.color());
+        self.set_stroke_width(style.stroke_width());
 
         let mut path = path.into_iter();
 
         if let Some((x, y)) = path.next() {
-            self.call_cairo(|c| c.move_to(f64::from(x), f64::from(y)))?;
+            self.context.move_to(f64::from(x), f64::from(y));
 
             for (x, y) in path {
-                self.call_cairo(|c| c.line_to(f64::from(x), f64::from(y)))?;
+                self.context.line_to(f64::from(x), f64::from(y));
             }
 
-            self.call_cairo(|c| {
-                c.close_path();
-                c.fill();
-            })
-        } else {
-            Ok(())
+            self.context.close_path();
+            self.context
+                .fill()
+                .map_err(DrawingErrorKind::DrawingError)?;
         }
+
+        Ok(())
     }
 
     fn draw_circle<S: BackendStyle>(
@@ -242,25 +221,29 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         style: &S,
         fill: bool,
     ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
-        self.set_color(&style.color())?;
-        self.set_stroke_width(style.stroke_width())?;
+        self.set_color(&style.color());
+        self.set_stroke_width(style.stroke_width());
 
-        self.call_cairo(|c| {
-            c.new_sub_path();
-            c.arc(
-                f64::from(center.0),
-                f64::from(center.1),
-                f64::from(radius),
-                0.0,
-                std::f64::consts::PI * 2.0,
-            );
+        self.context.new_sub_path();
+        self.context.arc(
+            f64::from(center.0),
+            f64::from(center.1),
+            f64::from(radius),
+            0.0,
+            std::f64::consts::PI * 2.0,
+        );
 
-            if fill {
-                c.fill();
-            } else {
-                c.stroke();
-            }
-        })
+        if fill {
+            self.context
+                .fill()
+                .map_err(DrawingErrorKind::DrawingError)?;
+        } else {
+            self.context
+                .stroke()
+                .map_err(DrawingErrorKind::DrawingError)?;
+        }
+
+        Ok(())
     }
 
     fn estimate_text_size<S: BackendTextStyle>(
@@ -268,11 +251,14 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         text: &str,
         font: &S,
     ) -> Result<(u32, u32), DrawingErrorKind<Self::ErrorType>> {
-        self.set_font(font)?;
-        self.call_cairo(|c| {
-            let extents = c.text_extents(text);
-            (extents.width as u32, extents.height as u32)
-        })
+        self.set_font(font);
+
+        let extents = self
+            .context
+            .text_extents(text)
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        Ok((extents.width as u32, extents.height as u32))
     }
 
     fn draw_text<S: BackendTextStyle>(
@@ -293,39 +279,51 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
             * std::f64::consts::PI;
 
         if degree != 0.0 {
-            self.call_cairo(|c| {
-                c.save();
-                c.translate(f64::from(x), f64::from(y));
-                c.rotate(degree);
-            })?;
+            self.context
+                .save()
+                .map_err(DrawingErrorKind::DrawingError)?;
+            self.context.translate(f64::from(x), f64::from(y));
+            self.context.rotate(degree);
+
             x = 0;
             y = 0;
         }
 
-        self.set_font(style)?;
-        self.set_color(&color)?;
+        self.set_font(style);
+        self.set_color(&color);
 
-        self.call_cairo(|c| {
-            let extents = c.text_extents(text);
-            let dx = match style.anchor().h_pos {
-                HPos::Left => 0.0,
-                HPos::Right => -extents.width,
-                HPos::Center => -extents.width / 2.0,
-            };
-            let dy = match style.anchor().v_pos {
-                VPos::Top => extents.height,
-                VPos::Center => extents.height / 2.0,
-                VPos::Bottom => 0.0,
-            };
-            c.move_to(
-                f64::from(x) + dx - extents.x_bearing,
-                f64::from(y) + dy - extents.y_bearing - extents.height,
-            );
-            c.show_text(text);
-            if degree != 0.0 {
-                c.restore();
-            }
-        })
+        let extents = self
+            .context
+            .text_extents(text)
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        let dx = match style.anchor().h_pos {
+            HPos::Left => 0.0,
+            HPos::Right => -extents.width,
+            HPos::Center => -extents.width / 2.0,
+        };
+        let dy = match style.anchor().v_pos {
+            VPos::Top => extents.height,
+            VPos::Center => extents.height / 2.0,
+            VPos::Bottom => 0.0,
+        };
+
+        self.context.move_to(
+            f64::from(x) + dx - extents.x_bearing,
+            f64::from(y) + dy - extents.y_bearing - extents.height,
+        );
+
+        self.context
+            .show_text(text)
+            .map_err(DrawingErrorKind::DrawingError)?;
+
+        if degree != 0.0 {
+            self.context
+                .restore()
+                .map_err(DrawingErrorKind::DrawingError)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -356,16 +354,14 @@ mod test {
     fn draw_mesh_with_custom_ticks(tick_size: i32, test_name: &str) {
         let buffer: Vec<u8> = vec![];
         let surface = cairo::PsSurface::for_stream(500.0, 500.0, buffer).unwrap();
-        let cr = CairoContext::new(&surface);
-        let root = CairoBackend::new(&cr, (500, 500))
-            .unwrap()
-            .into_drawing_area();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (500, 500)).into_drawing_area();
 
         // Text could be rendered to different elements if has whitespaces
         let mut chart = ChartBuilder::on(&root)
             .caption("this-is-a-test", ("sans-serif", 20))
             .set_all_label_area_size(40)
-            .build_ranged(0..10, 0..10)
+            .build_cartesian_2d(0..10, 0..10)
             .unwrap();
 
         chart
@@ -378,6 +374,9 @@ mod test {
         let content = String::from_utf8(buffer).unwrap();
         checked_save_file(test_name, &content);
 
+        // FIXME: through some change in cairo or something the caption no longer
+        // appears in plaintext so this assertion will fail even though the postscript
+        // file contains the heading
         assert!(content.contains("this-is-a-test"));
     }
 
@@ -396,10 +395,8 @@ mod test {
         let buffer: Vec<u8> = vec![];
         let (width, height) = (1500, 800);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
-        let cr = CairoContext::new(&surface);
-        let root = CairoBackend::new(&cr, (width, height))
-            .unwrap()
-            .into_drawing_area();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (width, height)).into_drawing_area();
         let root = root
             .titled("Image Title", ("sans-serif", 60).into_font())
             .unwrap();
@@ -407,7 +404,7 @@ mod test {
         let mut chart = ChartBuilder::on(&root)
             .caption("All anchor point positions", ("sans-serif", 20))
             .set_all_label_area_size(40)
-            .build_ranged(0..100, 0..50)
+            .build_cartesian_2d(0..100, 0..50)
             .unwrap();
 
         chart
@@ -452,6 +449,7 @@ mod test {
         let content = String::from_utf8(buffer).unwrap();
         checked_save_file("test_text_draw", &content);
 
+        // FIXME: see `draw_mesh_with_custom_ticks`
         assert_eq!(content.matches("dog").count(), 36);
         assert_eq!(content.matches("dood").count(), 36);
         assert_eq!(content.matches("goog").count(), 36);
@@ -462,10 +460,8 @@ mod test {
         let buffer: Vec<u8> = vec![];
         let (width, height) = (500_i32, 500_i32);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
-        let cr = CairoContext::new(&surface);
-        let root = CairoBackend::new(&cr, (width as u32, height as u32))
-            .unwrap()
-            .into_drawing_area();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (width as u32, height as u32)).into_drawing_area();
 
         let style = TextStyle::from(("sans-serif", 20).into_font())
             .pos(Pos::new(HPos::Center, VPos::Center));
@@ -495,15 +491,13 @@ mod test {
         let buffer: Vec<u8> = vec![];
         let (width, height) = (500, 500);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
-        let cr = CairoContext::new(&surface);
-        let root = CairoBackend::new(&cr, (width, height))
-            .unwrap()
-            .into_drawing_area();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (width, height)).into_drawing_area();
 
         let mut chart = ChartBuilder::on(&root)
             .caption("All series label positions", ("sans-serif", 20))
             .set_all_label_area_size(40)
-            .build_ranged(0..50, 0..50)
+            .build_cartesian_2d(0..50, 0..50)
             .unwrap();
 
         chart
@@ -557,10 +551,8 @@ mod test {
         let buffer: Vec<u8> = vec![];
         let (width, height) = (100_i32, 100_i32);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
-        let cr = CairoContext::new(&surface);
-        let root = CairoBackend::new(&cr, (width as u32, height as u32))
-            .unwrap()
-            .into_drawing_area();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (width as u32, height as u32)).into_drawing_area();
 
         for i in -20..20 {
             let alpha = i as f64 * 0.1;
