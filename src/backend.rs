@@ -15,6 +15,18 @@ pub struct CairoBackend<'a> {
     init_flag: bool,
 }
 
+
+#[derive(Debug)]
+pub struct CairoError;
+
+impl std::fmt::Display for CairoError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(fmt, "{:?}", self)
+    }
+}
+
+impl std::error::Error for CairoError {}
+
 impl<'a> CairoBackend<'a> {
     fn set_color(&self, color: &BackendColor) {
         self.context.set_source_rgba(
@@ -355,7 +367,9 @@ mod test {
         let buffer: Vec<u8> = vec![];
         let surface = cairo::PsSurface::for_stream(500.0, 500.0, buffer).unwrap();
         let cr = CairoContext::new(&surface).unwrap();
-        let root = CairoBackend::new(&cr, (500, 500)).into_drawing_area();
+        let root = CairoBackend::new(&cr, (500, 500))
+            .unwrap()
+            .into_drawing_area();
 
         // Text could be rendered to different elements if has whitespaces
         let mut chart = ChartBuilder::on(&root)
@@ -396,7 +410,9 @@ mod test {
         let (width, height) = (1500, 800);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
         let cr = CairoContext::new(&surface).unwrap();
-        let root = CairoBackend::new(&cr, (width, height)).into_drawing_area();
+        let root = CairoBackend::new(&cr, (width, height))
+            .unwrap()
+            .into_drawing_area();
         let root = root
             .titled("Image Title", ("sans-serif", 60).into_font())
             .unwrap();
@@ -461,7 +477,9 @@ mod test {
         let (width, height) = (500_i32, 500_i32);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
         let cr = CairoContext::new(&surface).unwrap();
-        let root = CairoBackend::new(&cr, (width as u32, height as u32)).into_drawing_area();
+        let root = CairoBackend::new(&cr, (width as u32, height as u32))
+            .unwrap()
+            .into_drawing_area();
 
         let style = TextStyle::from(("sans-serif", 20).into_font())
             .pos(Pos::new(HPos::Center, VPos::Center));
@@ -492,7 +510,9 @@ mod test {
         let (width, height) = (500, 500);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
         let cr = CairoContext::new(&surface).unwrap();
-        let root = CairoBackend::new(&cr, (width, height)).into_drawing_area();
+        let root = CairoBackend::new(&cr, (width, height))
+            .unwrap()
+            .into_drawing_area();
 
         let mut chart = ChartBuilder::on(&root)
             .caption("All series label positions", ("sans-serif", 20))
@@ -552,7 +572,9 @@ mod test {
         let (width, height) = (100_i32, 100_i32);
         let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
         let cr = CairoContext::new(&surface).unwrap();
-        let root = CairoBackend::new(&cr, (width as u32, height as u32)).into_drawing_area();
+        let root = CairoBackend::new(&cr, (width as u32, height as u32))
+            .unwrap()
+            .into_drawing_area();
 
         for i in -20..20 {
             let alpha = i as f64 * 0.1;
