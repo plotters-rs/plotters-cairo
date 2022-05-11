@@ -55,13 +55,13 @@ impl<'a> CairoBackend<'a> {
         self.context.set_font_size(font.size());
     }
 
-    pub fn new(context: &'a CairoContext, (w, h): (u32, u32)) -> Self {
-        Self {
+    pub fn new(context: &'a CairoContext, (w, h): (u32, u32)) -> Result<Self, CairoError> {
+        Ok(Self {
             context,
             width: w,
             height: h,
             init_flag: false,
-        }
+        })
     }
 }
 
