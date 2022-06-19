@@ -15,7 +15,6 @@ pub struct CairoBackend<'a> {
     init_flag: bool,
 }
 
-
 #[derive(Debug)]
 pub struct CairoError;
 
@@ -159,8 +158,8 @@ impl<'a> DrawingBackend for CairoBackend<'a> {
         self.context.rectangle(
             f64::from(upper_left.0),
             f64::from(upper_left.1),
-            f64::from(bottom_right.0 - upper_left.0),
-            f64::from(bottom_right.1 - upper_left.1),
+            f64::from(bottom_right.0 - upper_left.0 + 1),
+            f64::from(bottom_right.1 - upper_left.1 + 1),
         );
 
         if fill {
@@ -585,5 +584,26 @@ mod test {
         let buffer = *surface.finish_output_stream().unwrap().downcast().unwrap();
         let content = String::from_utf8(buffer).unwrap();
         checked_save_file("test_draw_pixel_alphas", &content);
+    }
+
+    #[test]
+    fn test_rect_width_and_height() {
+        let buffer: Vec<u8> = vec![];
+        let (width, height) = (200_i32, 100_i32);
+        let surface = cairo::PsSurface::for_stream(width.into(), height.into(), buffer).unwrap();
+        let cr = CairoContext::new(&surface).unwrap();
+        let root = CairoBackend::new(&cr, (width as u32, height as u32))
+            .unwrap()
+            .into_drawing_area();
+
+        root.fill(&WHITE).unwrap();
+
+        let buffer = *surface.finish_output_stream().unwrap().downcast().unwrap();
+        let content = String::from_utf8(buffer).unwrap();
+        checked_save_file("test_rect_width_and_height", &content);
+
+        assert!(content
+            .lines()
+            .any(|line| line == format!("0 0 {width} {height} rectfill")));
     }
 }

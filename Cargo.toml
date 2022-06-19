@@ -11,8 +11,8 @@ readme = "README.md"
 
 [dependencies]
 plotters-backend = "^0.3.0"
-cairo-rs = { version = "0.15.1", default-features = false }
+cairo-rs = { version = "0.15.11", default-features = false }
 
 [dev-dependencies]
 plotters = { version = "^0.3.0", default_features = false }
-cairo-rs = { version = "0.15.1", features = ["ps"], default-features = false }
+cairo-rs = { version = "0.15.11", features = ["ps"], default-features = false }
