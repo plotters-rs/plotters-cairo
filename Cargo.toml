@@ -10,9 +10,16 @@ repository = "https://github.com/plotters-rs/plotters-cairo"
 readme = "README.md"
 
 [dependencies]
-plotters-backend = "^0.3.0"
 cairo-rs = { version = "0.15.1", default-features = false }
 
+[dependencies.plotters-backend]
+git = "https://github.com/plotters-rs/plotters-backend"
+# version = "0.3.1"
+
 [dev-dependencies]
-plotters = { version = "^0.3.0", default_features = false }
 cairo-rs = { version = "0.15.1", features = ["ps"], default-features = false }
+
+[dev-dependencies.plotters]
+default_features = false
+git = "https://github.com/plotters-rs/plotters"
+# version = "0.3.1"
