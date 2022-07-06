@@ -1,6 +1,6 @@
 [package]
 name = "plotters-cairo"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Hao Hou <haohou302@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -13,11 +13,13 @@ readme = "README.md"
 cairo-rs = { version = "0.15.11", default-features = false }
 
 [dependencies.plotters-backend]
-git = "https://github.com/plotters-rs/plotters.git"
+version = "0.3"
+#git = "https://github.com/plotters-rs/plotters.git"
 
 [dev-dependencies]
 cairo-rs = { version = "0.15.1", features = ["ps"], default-features = false }
 
 [dev-dependencies.plotters]
 default_features = false
-git = "https://github.com/plotters-rs/plotters.git"
+version = "0.3"
+#git = "https://github.com/plotters-rs/plotters.git"
