@@ -10,13 +10,13 @@ repository = "https://github.com/plotters-rs/plotters-cairo"
 readme = "README.md"
 
 [dependencies]
-cairo-rs = { version = "0.18", default-features = false }
+cairo-rs = { version = "0.19", default-features = false }
 
 [dependencies.plotters-backend]
 version = "0.3.5"
 
 [dev-dependencies]
-cairo-rs = { version = "0.18", features = ["ps"], default-features = false }
+cairo-rs = { version = "0.19", features = ["ps"], default-features = false }
 
 [dev-dependencies.plotters]
 default_features = false
