@@ -19,5 +19,5 @@ version = "0.3.5"
 cairo-rs = { version = "0.20", features = ["ps"], default-features = false }
 
 [dev-dependencies.plotters]
-default_features = false
+default-features = false
 version = "0.3.5"
